@@ -1,6 +1,9 @@
 ## MirrorGAN &mdash; Simple TensorFlow Implementation [[Paper]](https://arxiv.org/abs/1903.05854)
 ### : Learning Text-to-image Generation by Redescription
 
+<div align="center">
+  <img src="./assets/teaser.png">
+</div>
 
 ## Dataset
 ### Text
