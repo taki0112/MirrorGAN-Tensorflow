@@ -5,6 +5,9 @@
   <img src="./assets/teaser.png">
 </div>
 
+## Requirements
+* **tensorflow >= 1.15**
+
 ## Dataset
 ### Text
 * [birds](https://drive.google.com/file/d/1O_LtUP9sch09QH3s_EBAgLEctBQ5JBSJ/view)
