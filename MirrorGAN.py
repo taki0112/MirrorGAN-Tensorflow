@@ -141,7 +141,7 @@ class MirrorGAN():
 
             hiddens, _ = various_rnn(x, n_layers, n_hidden, dropout_rate=0.0, bidirectional=False, rnn_type='lstm', scope='rnn')
 
-            x = fully_connected(x, units=caption.shape[1], use_bias=True, sn=self.sn, scope='caption_rnn_output')
+            x = fully_connected(hiddens, units=caption.shape[1], use_bias=True, sn=self.sn, scope='caption_rnn_output')
 
             return x
 
