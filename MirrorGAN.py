@@ -131,7 +131,7 @@ class MirrorGAN():
             return x_feature
 
     def caption_rnn(self, feature, caption, n_words,
-                    embed_dim=256, n_hidden=256, n_layers=1,
+                    embed_dim=256, n_hidden=512, n_layers=1,
                     reuse=tf.AUTO_REUSE, scope='generator_caption_rnn'):
         with tf.variable_scope(scope, reuse=reuse):
             embeddings = embed_sequence(caption, n_words=n_words, embed_dim=embed_dim, trainable=True, scope='embed_layer')
@@ -366,7 +366,7 @@ class MirrorGAN():
             uncond_fake_logits, cond_fake_logits = self.discriminator([fake_img_64, fake_img_128, fake_img_256], sent_emb)
 
             fake_img_256_feature = self.caption_cnn(fake_img_256)
-            fake_img_256_caption = self.caption_rnn(fake_img_256_feature, caption, n_words=len(idx_to_word), embed_dim=self.embed_dim, n_hidden=128 * 2, n_layers=1)
+            fake_img_256_caption = self.caption_rnn(fake_img_256_feature, caption, n_words=len(idx_to_word), embed_dim=self.embed_dim, n_hidden=256 * 2, n_layers=1)
 
             self.g_adv_loss, self.d_adv_loss = 0, 0
             for i in range(3):
