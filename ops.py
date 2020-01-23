@@ -437,12 +437,16 @@ def caption_loss(cap_output, captions):
     # log-softmax cross_entropy loss
     # https://stevensmit.me/softmax-or-log-softmax-for-cross-entropy-loss-in-tensorflow/
 
-    # loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=tf.cast(cap_output, tf.float32), labels=tf.cast(captions, tf.float32))
+
+    # loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=tf.cast(cap_output, tf.float32), labels=captions)
     # loss = tf.reduce_mean(loss)
 
     cap_output = tf.nn.log_softmax(cap_output)
-    loss = tf.reduce_sum(-1 * tf.math.multiply(tf.cast(captions, tf.float32), cap_output), axis=-1)
+    loss = tf.reduce_sum(-1 * tf.math.multiply(captions, cap_output), axis=-1)
     loss = tf.reduce_mean(loss)
+
+    # loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=cap_output, labels=captions)
+    # loss = tf.reduce_mean(loss)
 
     return loss
 

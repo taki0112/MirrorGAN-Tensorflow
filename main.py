@@ -17,13 +17,13 @@ def parse_args():
     parser.add_argument('--print_freq', type=int, default=1000, help='The number of image_print_freq')
     parser.add_argument('--save_freq', type=int, default=10000, help='The number of ckpt_save_freq')
 
-    parser.add_argument('--lr', type=float, default=0.0002, help='The learning rate')
+    parser.add_argument('--lr', type=float, default=0.0001, help='The learning rate')
 
     parser.add_argument('--gan_type', type=str, default='gan', help='[gan / lsgan / hinge]')
 
     parser.add_argument('--adv_weight', type=int, default=1, help='Weight about GAN')
     parser.add_argument('--kl_weight', type=int, default=1, help='Weight about kl_loss')
-    parser.add_argument('--cap_weight', type=int, default=1, help='Weight about cap_weight')
+    parser.add_argument('--cap_weight', type=int, default=10, help='Weight about cap_weight')
 
     parser.add_argument('--z_dim', type=int, default=100, help='condition & noise z dimension')
     parser.add_argument('--embed_dim', type=int, default=256, help='embedding dimension')
