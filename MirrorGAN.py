@@ -1,7 +1,8 @@
 from utils import *
 import time
-from tensorflow.python.data.experimental import prefetch_to_device, shuffle_and_repeat, map_and_batch # >= tf 1.15
+from tensorflow.python.data.experimental import prefetch_to_device, shuffle_and_repeat, map_and_batch  # >= tf 1.15
 from networks import *
+
 
 class MirrorGAN():
     def __init__(self, args):
@@ -32,13 +33,11 @@ class MirrorGAN():
         self.embed_dim = args.embed_dim
         self.z_dim = args.z_dim
 
-
         """ Weight """
         self.adv_weight = args.adv_weight
         self.kl_weight = args.kl_weight
         self.cap_weight = args.cap_weight
         self.embed_weight = args.embed_weight
-
 
         """ Generator """
 
@@ -101,7 +100,7 @@ class MirrorGAN():
         idx_to_word : 5450 5450
         """
 
-        if self.phase == 'train' :
+        if self.phase == 'train':
             self.dataset_num = len(train_images)
 
             img_and_caption = tf.data.Dataset.from_tensor_slices((train_images, train_captions, train_class_id))
@@ -128,10 +127,18 @@ class MirrorGAN():
             self.caption_rnn = CaptionRNN(vocab_size=self.vocab_size, embed_dim=self.embed_dim, n_hidden=512, n_layer=1)
 
             """ Optimizer """
-            self.g_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
-            self.d_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
-            self.rnn_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
-            self.embed_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
+            self.g_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999,
+                                                        epsilon=1e-08)
+
+            d_64_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
+            d_128_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
+            d_256_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999, epsilon=1e-08)
+            self.d_optimizer = [d_64_optimizer, d_128_optimizer, d_256_optimizer]
+
+            self.rnn_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999,
+                                                          epsilon=1e-08)
+            self.embed_optimizer = tf.keras.optimizers.Adam(learning_rate=self.init_lr, beta_1=0.5, beta_2=0.999,
+                                                            epsilon=1e-08)
 
             """ Checkpoint """
             self.ckpt = tf.train.Checkpoint(rnn_encoder=self.rnn_encoder, cnn_encoder=self.cnn_encoder,
@@ -140,7 +147,10 @@ class MirrorGAN():
                                             discriminator=self.discriminator,
                                             caption_cnn=self.caption_cnn,
                                             caption_rnn=self.caption_rnn,
-                                            g_optimizer=self.g_optimizer, d_optimizer=self.d_optimizer,
+                                            g_optimizer=self.g_optimizer,
+                                            d_64_optimizer=d_64_optimizer,
+                                            d_128_optimizer=d_128_optimizer,
+                                            d_256_optimizer=d_256_optimizer,
                                             rnn_optimizer=self.rnn_optimizer, embed_optimizer=self.embed_optimizer)
             self.manager = tf.train.CheckpointManager(self.ckpt, self.checkpoint_dir, max_to_keep=2)
             self.start_iteration = 0
@@ -153,7 +163,7 @@ class MirrorGAN():
             else:
                 print('Not restoring from saved checkpoint')
 
-        else :
+        else:
             """ Test """
             self.dataset_num = len(test_captions)
 
@@ -162,7 +172,8 @@ class MirrorGAN():
 
             img_and_caption = img_and_caption.apply(
                 shuffle_and_repeat(self.dataset_num)).apply(
-                map_and_batch(img_data_class.image_processing, batch_size=self.batch_size, num_parallel_batches=16, drop_remainder=True)).apply(
+                map_and_batch(img_data_class.image_processing, batch_size=self.batch_size, num_parallel_batches=16,
+                              drop_remainder=True)).apply(
                 prefetch_to_device(gpu_device, None))
 
             self.img_caption_iter = iter(img_and_caption)
@@ -180,7 +191,7 @@ class MirrorGAN():
 
             """ Checkpoint """
             self.ckpt = tf.train.Checkpoint(rnn_encoder=self.rnn_encoder,
-                                            ca_net = self.ca_net,
+                                            ca_net=self.ca_net,
                                             generator=self.generator,
                                             discriminator=self.discriminator)
             self.manager = tf.train.CheckpointManager(self.ckpt, self.checkpoint_dir, max_to_keep=2)
@@ -192,18 +203,19 @@ class MirrorGAN():
                 print('start iteration : ', self.start_iteration)
             else:
                 print('Not restoring from saved checkpoint')
+
     """
     def rnn_train_step(self, real_256, caption):
         with tf.GradientTape() as rnn_tape:
             target_sentence_index = tf.random.uniform(shape=[], minval=0, maxval=10, dtype=tf.int32)
             caption = tf.gather(caption, target_sentence_index, axis=1)
-            
+
             word_emb, sent_emb, mask = self.rnn_encoder(caption, training=True)
             z_code = tf.random.normal(shape=[self.batch_size, self.z_dim])
             c_code, mu, logvar = self.ca_net(sent_emb, training=True)
             fake_imgs = self.generator([c_code, z_code, word_emb, mask], training=True)
             fake_64, fake_128, fake_256 = fake_imgs
-            
+
 
             real_256_feature = self.caption_cnn(real_256)
             real_256_caption = self.caption_rnn([real_256_feature, caption])
@@ -220,6 +232,7 @@ class MirrorGAN():
 
         return g_cap_loss, accuracy
     """
+
     def embed_train_step(self, real_256, caption, class_id):
         with tf.GradientTape() as embed_tape:
             target_sentence_index = tf.random.uniform(shape=[], minval=0, maxval=10, dtype=tf.int32)
@@ -256,7 +269,8 @@ class MirrorGAN():
                 real_caption_onehot = caption_onehot[:, i]
 
                 fake_caption_onehot = self.caption_rnn([real_256_feature, dec_input])
-                g_cap_loss += self.cap_weight * caption_loss(fake_caption_onehot, real_caption_onehot) / caption.shape[1]
+                g_cap_loss += self.cap_weight * caption_loss(fake_caption_onehot, real_caption_onehot) / caption.shape[
+                    1]
 
                 fake_caption_all = tf.concat([fake_caption_all, tf.expand_dims(fake_caption_onehot, axis=1)], axis=1)
 
@@ -275,7 +289,7 @@ class MirrorGAN():
         return g_cap_loss, accuracy
 
     def d_train_step(self, real_256, caption):
-        with tf.GradientTape() as d_tape:
+        with tf.GradientTape() as d_64_tape, tf.GradientTape() as d_128_tape, tf.GradientTape() as d_256_tape :
             target_sentence_index = tf.random.uniform(shape=[], minval=0, maxval=10, dtype=tf.int32)
             caption = tf.gather(caption, target_sentence_index, axis=1)
 
@@ -287,26 +301,36 @@ class MirrorGAN():
             real_64, real_128 = resize(real_256, target_size=[64, 64]), resize(real_256, target_size=[128, 128])
             fake_64, fake_128, fake_256 = fake_imgs
 
-            uncond_real_logits, cond_real_logits = self.discriminator([real_64, real_128, real_256, sent_emb], training=True)
-            _, cond_wrong_logits = self.discriminator([real_64[:(self.batch_size - 1)], real_128[:(self.batch_size - 1)], real_256[:(self.batch_size - 1)], sent_emb[1:self.batch_size]])
-            uncond_fake_logits, cond_fake_logits = self.discriminator([fake_64, fake_128, fake_256, sent_emb], training=True)
+            uncond_real_logits, cond_real_logits = self.discriminator([real_64, real_128, real_256, sent_emb],
+                                                                      training=True)
+            _, cond_wrong_logits = self.discriminator(
+                [real_64[:(self.batch_size - 1)], real_128[:(self.batch_size - 1)], real_256[:(self.batch_size - 1)],
+                 sent_emb[1:self.batch_size]])
+            uncond_fake_logits, cond_fake_logits = self.discriminator([fake_64, fake_128, fake_256, sent_emb],
+                                                                      training=True)
 
-            d_adv_loss = 0
+            d_adv_loss = []
 
             for i in range(3):
-                uncond_real_loss, uncond_fake_loss = discriminator_loss(self.gan_type, uncond_real_logits[i], uncond_fake_logits[i])
-                cond_real_loss, cond_fake_loss = discriminator_loss(self.gan_type, cond_real_logits[i], cond_fake_logits[i])
+                uncond_real_loss, uncond_fake_loss = discriminator_loss(self.gan_type, uncond_real_logits[i],
+                                                                        uncond_fake_logits[i])
+                cond_real_loss, cond_fake_loss = discriminator_loss(self.gan_type, cond_real_logits[i],
+                                                                    cond_fake_logits[i])
                 _, cond_wrong_loss = discriminator_loss(self.gan_type, None, cond_wrong_logits[i])
 
-                d_adv_loss += self.adv_weight * (((uncond_real_loss + cond_real_loss) / 2) + (uncond_fake_loss + cond_fake_loss + cond_wrong_loss) / 3)
+                each_d_adv_loss = self.adv_weight * (((uncond_real_loss + cond_real_loss) / 2) + (uncond_fake_loss + cond_fake_loss + cond_wrong_loss) / 3)
+                d_adv_loss.append(each_d_adv_loss)
 
-            d_loss = d_adv_loss
+            d_loss = tf.reduce_sum(d_adv_loss)
 
-        d_train_variable = self.discriminator.trainable_variables
-        d_gradient = d_tape.gradient(d_loss, d_train_variable)
-        self.d_optimizer.apply_gradients(zip(d_gradient, d_train_variable))
+        d_train_variable = [self.discriminator.d_64.trainable_variables, self.discriminator.d_128.trainable_variables, self.discriminator.d_256.trainable_variables]
+        d_tape = [d_64_tape, d_128_tape, d_256_tape]
 
-        return d_loss, d_adv_loss
+        for i in range(3):
+            d_gradient = d_tape[i].gradient(d_adv_loss[i], d_train_variable[i])
+            self.d_optimizer[i].apply_gradients(zip(d_gradient, d_train_variable[i]))
+
+        return d_loss, tf.reduce_sum(d_adv_loss)
 
     def g_train_step(self, caption):
         with tf.GradientTape() as g_tape:
@@ -331,7 +355,8 @@ class MirrorGAN():
                 real_caption_onehot = caption_onehot[:, i]
 
                 fake_caption_onehot = self.caption_rnn([fake_256_feature, dec_input])
-                g_cap_loss += self.cap_weight * caption_loss(fake_caption_onehot, real_caption_onehot) / caption.shape[1]
+                g_cap_loss += self.cap_weight * caption_loss(fake_caption_onehot, real_caption_onehot) / caption.shape[
+                    1]
 
                 fake_caption_all = tf.concat([fake_caption_all, tf.expand_dims(fake_caption_onehot, axis=1)], axis=1)
 
@@ -342,12 +367,15 @@ class MirrorGAN():
 
             # g_cap_loss = self.cap_weight * caption_loss(fake_256_caption, caption)
 
-            uncond_fake_logits, cond_fake_logits = self.discriminator([fake_64, fake_128, fake_256, sent_emb], training=True)
+            uncond_fake_logits, cond_fake_logits = self.discriminator([fake_64, fake_128, fake_256, sent_emb],
+                                                                      training=True)
 
             g_adv_loss = 0
 
             for i in range(3):
-                g_adv_loss += self.adv_weight * (generator_loss(self.gan_type, uncond_fake_logits[i]) + generator_loss(self.gan_type, cond_fake_logits[i]))
+                g_adv_loss += self.adv_weight * (
+                            generator_loss(self.gan_type, uncond_fake_logits[i]) + generator_loss(self.gan_type,
+                                                                                                  cond_fake_logits[i]))
 
             g_kl_loss = self.kl_weight * kl_loss(mu, logvar)
 
@@ -358,7 +386,6 @@ class MirrorGAN():
         self.g_optimizer.apply_gradients(zip(g_gradient, g_train_variable))
 
         return g_adv_loss, g_kl_loss, fake_256
-
 
     def train(self):
         start_time = time.time()
@@ -378,7 +405,8 @@ class MirrorGAN():
                     lr = self.init_lr * pow(0.5, idx // decay_start_step)
                     # 4 0 4 2
                     self.g_optimizer.learning_rate = lr
-                    self.d_optimizer.learning_rate = lr
+                    for i in range(3):
+                        self.d_optimizer[i].learning_rate = lr
                     self.rnn_optimizer.learning_rate = lr
                     self.embed_optimizer.learning_rate = lr
 
@@ -424,7 +452,8 @@ class MirrorGAN():
                             './{}/merge_{:07d}.jpg'.format(self.sample_dir, idx + 1))
 
             # display training status
-            print("Iteration: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f" % (idx, self.iteration, time.time() - start_time, d_loss, g_loss))
+            print("Iteration: [%6d/%6d] time: %4.4f d_loss: %.8f, g_loss: %.8f" % (
+            idx, self.iteration, time.time() - start_time, d_loss, g_loss))
 
         # save model for final step
         self.manager.save(checkpoint_number=self.iteration)
@@ -437,9 +466,9 @@ class MirrorGAN():
             sn = ''
 
         return "{}_{}_{}_{}adv_{}kl_{}cap_{}embed{}".format(self.model_name, self.dataset_name, self.gan_type,
-                                                           self.adv_weight, self.kl_weight, self.cap_weight, self.embed_weight,
-                                                           sn)
-
+                                                            self.adv_weight, self.kl_weight, self.cap_weight,
+                                                            self.embed_weight,
+                                                            sn)
 
     def test(self):
 
@@ -463,7 +492,7 @@ class MirrorGAN():
 
         fake_256 = fake_imgs[-1]
 
-        for i in range(5) :
+        for i in range(5):
             real_path = os.path.join(self.result_dir, 'real_{}.jpg'.format(i))
             fake_path = os.path.join(self.result_dir, 'fake_{}.jpg'.format(i))
 
